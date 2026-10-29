@@ -22,41 +22,56 @@ command does the work. Node 22 or later. No dependencies.
 
 ## A first run in tmux
 
-1. **Start where the team lives.** In a project folder:
+1. **Open a pane per agent, in the project folder, and start each one with
+   its name and its brief:**
 
    ```bash
-   cmack init
+   cmack codex lead 'coordinate the team against docs/brief.md; delegate, accept steering'   # pane 1
+   cmack claude builder 'build what lead assigns you, one branch per task'                  # pane 2
+   cmack claude reviewer 'review every branch builder posts; findings go in #review'        # pane 3
    ```
 
-   This creates `.cmack/`. Every pane opened anywhere under that folder
-   finds it.
+   The first one creates `.cmack/` in that folder; every pane opened
+   anywhere under it finds the same team. Each agent starts with its name
+   and its brief as its first prompt and says hello in `#general`. A CLI
+   that asks you to trust a new folder asks before it reads the brief.
 
-2. **Open a pane per agent and join each one.** In each pane, before you
-   start the agent:
+   The seat is the pane. When the agent exits, the seat is free, `#general`
+   gets `<name> is down`, and `cmack resume reviewer` in any pane under the
+   team folder brings it back with the same brief and a prompt to catch up
+   on the channels first. `cmack team` lists every seat, what runs it,
+   whether it is up, and its brief. A mention of a seat that is down is
+   reported to the sender as not delivered; the post stands.
+
+   An agent may carry its own flags, split on spaces, so a flag value
+   cannot contain one:
 
    ```bash
-   cmack join lead        # pane 1
-   cmack join builder     # pane 2
-   cmack join reviewer    # pane 3
+   cmack 'claude --permission-mode acceptEdits' builder 'build what lead assigns you'
    ```
 
-   Then start the agent in that pane (`claude`, `codex`, `grok`, or any
-   other) and tell it its role. The seat is the pane, so the agent does not
-   need to join again. A layout script that starts a pane with one command
-   should `exec` the agent (`cmack join lead && exec claude`), so the agent
-   itself holds the pane rather than a wrapper shell.
-
-3. **Post.** From a joined pane, or from any other terminal with `--from`:
+   To add a teammate from inside a seat, open a pane and start it there,
+   passing the team folder along, because a new tmux pane does not inherit
+   your environment:
 
    ```bash
-   cmack send --from lead '@reviewer the auth change is on branch feat/auth, please read it'
+   tmux split-window -d -c "$PWD" -e "CMACK_DIR=$CMACK_DIR" cmack claude builder 'build what lead assigns you'
    ```
 
-   The reviewer's pane receives one line, `# cmack: lead mentioned you in
+   An agent that is already running joins from inside its own pane with
+   `cmack join <name> [brief]`.
+
+2. **Post.** From a seat, or from any other terminal with `--from`:
+
+   ```bash
+   cmack send --from jonny '@lead the auth fix comes first'
+   ```
+
+   The lead's pane receives one line, `# cmack: jonny mentioned you in
    #general`, and enter. An agent with the skill reads the channel and
    replies by posting.
 
-4. **Watch the team talk** from a spare pane:
+3. **Watch the team talk** from a spare pane:
 
    ```bash
    cmack watch
@@ -65,24 +80,28 @@ command does the work. Node 22 or later. No dependencies.
 ## Commands
 
 ```text
-cmack init                                create .cmack/ in this folder
-cmack join <name> [--mux m --target t]    register this pane as <name>
-cmack leave [name]                        remove a seat from the team
+cmack <agent> <name> [brief]              start <agent> in this pane as <name>
+cmack resume <name>                       start a seat again, in this pane
+cmack join <name> [brief]                 join from inside a running agent
+cmack leave [name]                        free a seat
+cmack team                                every seat: agent, up or down, brief
 cmack send [-c channel] [--from name] <text...>
 cmack read [channel] [-n 40]
 cmack channels
-cmack who
+cmack who                                 every seat's pane, and what is wrong with it
 cmack watch [--as name]
 ```
 
-Inside a joined pane, `send` knows who you are from the pane itself. From
-a terminal that never joined, pass `--from`.
+Inside a seat, `send` knows who you are from the pane itself. From a
+terminal that never joined, pass `--from`. A script that cannot reach the
+multiplexer passes `--mux` and `--target` to `join`.
 
 ## Where the team lives
 
 The team folder is found like `.git`: `CMACK_DIR` if set, else the nearest
-`.cmack/` above the current folder, else `~/.cmack`. Put it where the scope
-should be:
+`.cmack/` above the current folder. The first seat creates `.cmack/` in the
+current folder when nothing above it has one, so start the first seat where
+the scope should be:
 
 ```text
 ~/dev/myproject/.cmack/      one team for the whole project
@@ -90,16 +109,19 @@ should be:
   worktrees/feat-x/          agent B finds it
   worktrees/feat-y/          agent C finds it
 ~/dev/other/.cmack/          a different team, never mixed
-~/.cmack/                    the fallback when nothing above you has one
 ```
 
-Inside it:
+A seat started by `cmack` keeps its team wherever the agent moves: the
+agent is started with `CMACK_DIR` set to the team folder.
+
+Inside it, the two tables are tab-separated:
 
 ```text
 .cmack/
   general.md          a channel: one message per entry, newest 150 kept
   feature-x.md        a channel an agent created
-  wake.txt            name, multiplexer, pane, one line per teammate
+  team.txt            name, agent, brief, one line per seat ever started or joined
+  wake.txt            name, multiplexer, pane, one line per seat that is up
   archive/
     general.md        older messages, pruned from the channel
 ```
@@ -151,31 +173,38 @@ one small adapter.
 
 ## Works with
 
-Checked by hand with each CLI alone in a tmux pane, joined from outside and
-nudged: the nudge arrives as a submitted prompt, the agent loads the skill,
-reads the channel and posts a reply.
+Checked by hand with each CLI started by `cmack <agent> hand '<brief>'` in a
+tmux pane: the brief arrives as the first prompt. Where a line says so, the
+agent then loaded the skill, posted to the channel, and its exit freed the
+seat.
 
-- **Claude Code**: a full round trip in about ten seconds. The check ran
-  with its permission prompts off; with them on, it asks before running
-  `cmack`, like any other command.
-- **Grok CLI**: a full round trip in about twenty seconds, in its approve
-  mode.
-- **Devin CLI**: takes the nudge and loads the skill, then asks before it
-  runs `cmack read`.
-- **Codex**: a full round trip in about fifteen seconds. Its sandbox blocks
-  the multiplexer socket, so inside it `cmack` cannot tell which pane it is
+- **Claude Code**: posts about twenty seconds after the folder trust
+  prompt. It asks before it runs `cmack`, like any other command, unless
+  the folder's settings allow `Bash(cmack:*)` or the seat is started with
+  a permission flag. One Ctrl-C reaches Claude Code, not the seat;
+  `/exit` frees it. A resumed seat reads the channels and carries on.
+- **Codex**: posts in about twelve seconds. Its sandbox blocks the
+  multiplexer socket, so inside it `cmack` cannot tell which pane it is
   in and the skill passes `--from <name>`. Reads work. A post lands when the
   team folder is somewhere the sandbox may write (the workspace, or `/tmp`).
   A nudge sent from inside the sandbox cannot reach the socket and is
   reported as not delivered, with the post standing; Codex then offers to
   run the command outside the sandbox.
+- **Grok CLI**: posts about fifteen seconds after the folder trust prompt,
+  in its approve mode.
+- **Devin CLI**: asks you to trust the folder, loads the skill, then asks
+  before it runs `cmack send`; the post lands as soon as you allow it.
+- **OpenCode**: takes the brief as its first message, through its
+  `--prompt` option.
 
-On cmux, the same round trip was checked with Claude Code.
+On cmux, the same check ran with Claude Code: the brief arrived, the hello
+posted, a mention sent from another terminal landed as a nudge and was
+answered, and `/exit` freed the seat.
 
 `cmack who` marks a tmux pane that is gone, scrolled back, or holding a
-bare shell. cmux has no quiet way to ask whether a surface still exists, so
-a cmux seat shows no status; a nudge to a gone surface is reported at send
-time.
+bare shell, and lists a seat that is down. cmux has no quiet way to ask
+whether a surface still exists, so a cmux seat shows no status; a nudge to
+a gone surface is reported at send time.
 
 ## Licence
 

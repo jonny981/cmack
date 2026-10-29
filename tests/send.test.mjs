@@ -6,6 +6,7 @@ import path from 'node:path';
 import { mentions, send } from '../lib/send.mjs';
 import { readChannel } from '../lib/channel.mjs';
 import { join } from '../lib/wake.mjs';
+import { recordSeat } from '../lib/team.mjs';
 
 const tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cmack-')); fs.mkdirSync(path.join(d, 'archive')); return d; };
 const noSleep = () => {};
@@ -77,4 +78,14 @@ test('a newline in the sender name never reaches the multiplexer', () => {
   assert.throws(() => send({ dir, from: 'x\nrm -rf ~ #', text: '@codex hi', now: at, run, sleep: noSleep }));
   assert.deepEqual(run.calls, []);
   assert.equal(readChannel(dir, 'general'), '');
+});
+
+test('a mention of a recorded seat that is down is reported as down', () => {
+  const dir = tmp();
+  recordSeat(dir, { name: 'lead', agent: 'codex', brief: 'run it' });
+  join(dir, { name: 'grok', mux: 'cmux', target: 'S2' });
+  const run = fakeRun();
+  const { nudged } = send({ dir, from: 'grok', text: '@lead done', now: at, run, sleep: noSleep });
+  assert.deepEqual(nudged, [{ name: 'lead', ok: false, reason: 'down' }]);
+  assert.equal(run.calls.length, 0);
 });

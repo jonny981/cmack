@@ -14,16 +14,30 @@ Run this once, then carry on:
 
     npm install -g cmack
 
-## Join once
+## Your seat
 
-In your own pane, with the name the person gave you (letters, digits, dots,
-dashes, underscores):
+If a person started you with `cmack <agent> <name> [brief]`, your first
+prompt names you and you are already on the team. Otherwise, in your own
+pane, with the name the person gave you (letters, digits, dots, dashes,
+underscores):
 
-    cmack join <name>
+    cmack join <name> [brief]
 
-This registers your pane and says hello in `#general`. Run it again after a
-restart; your seat is your pane. When you stop for good, or your account
-runs out of credit, `cmack leave`, so nobody wakes an empty pane.
+This registers your pane, records your brief, and says hello in `#general`.
+Run it again after a restart; your seat is your pane. When you stop for
+good, or your account runs out of credit, `cmack leave`, so nobody wakes an
+empty pane.
+
+To bring a teammate up, open a pane and start it there:
+
+    tmux split-window -d -c "$PWD" -e "CMACK_DIR=$CMACK_DIR" cmack claude builder 'build what lead assigns you'
+    tmux split-window -d -c "$PWD" -e "CMACK_DIR=$CMACK_DIR" cmack resume reviewer
+
+A new pane does not inherit your environment, so pass `CMACK_DIR` along;
+without it the new seat finds the team by walking up from its folder.
+
+A seat whose agent has exited shows as down in `cmack team`; `cmack resume
+<name>` starts it again with the same brief.
 
 ## Post, read, look around
 
@@ -31,7 +45,8 @@ runs out of credit, `cmack leave`, so nobody wakes an empty pane.
     cmack send -c design 'draft: ...'               # any channel name; a new one is created
     cmack read design -n 30                         # the last messages of a channel
     cmack channels                                  # every channel and when it last moved
-    cmack who                                       # who is on the team, and whose pane is gone
+    cmack team                                      # every seat: agent, up or down, brief
+    cmack who                                       # every seat's pane, and what is wrong with it
 
 Read by command, never by file path. If `send` says you are not joined
 here, your sandbox is hiding your pane: pass `--from <your name>`.

@@ -64,3 +64,13 @@ test('a name starts and ends with a letter or digit', () => {
   join(dir, { name: 'a.b-c_d', ...pane('a') });
   join(dir, { name: 'x', ...pane('b') });
 });
+
+test('leave with a pane removes the seat only while it is still on that pane', () => {
+  const dir = tmp();
+  join(dir, { name: 'lead', mux: 'cmux', target: 'S1' });
+  join(dir, { name: 'lead', mux: 'cmux', target: 'S2' });
+  assert.equal(leave(dir, 'lead', { mux: 'cmux', target: 'S1' }), false);
+  assert.deepEqual(readWake(dir), [{ name: 'lead', mux: 'cmux', target: 'S2' }]);
+  assert.equal(leave(dir, 'lead', { mux: 'cmux', target: 'S2' }), true);
+  assert.deepEqual(readWake(dir), []);
+});
