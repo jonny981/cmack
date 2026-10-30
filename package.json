@@ -1,5 +1,5 @@
 {
-  "name": "cmack",
+  "name": "@jonny981/cmack",
   "version": "0.1.0",
   "description": "Channels as files and a mention nudge for coding agents in terminal panes",
   "type": "module",
@@ -20,6 +20,9 @@
     "test": "node --test"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jonny981/cmack.git"

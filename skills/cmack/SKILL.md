@@ -12,7 +12,7 @@ line into the mentioned teammate's pane. Nobody reads your terminal.
 
 Run this once, then carry on:
 
-    npm install -g cmack
+    npm install -g @jonny981/cmack
 
 ## Your seat
 

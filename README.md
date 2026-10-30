@@ -13,8 +13,8 @@ The seat is the pane. The record is a file.
 Two lines, each complete on its own:
 
 ```bash
-npx skills add jonny981/cmack -g -a claude-code -a codex -y   # the skill, for your agents
-npm install -g cmack                                           # the command
+npx skills add jonny981/cmack -g -a claude-code -a codex -a opencode -y   # the skill
+npm install -g @jonny981/cmack                                 # the command
 ```
 
 The skill teaches an agent to join, post, read, and act on a nudge. The
@@ -191,7 +191,8 @@ seat.
   reported as not delivered, with the post standing; Codex then offers to
   run the command outside the sandbox.
 - **Grok CLI**: posts about fifteen seconds after the folder trust prompt,
-  in its approve mode.
+  in its approve mode. It reads the skill from `~/.claude/skills/`, so the
+  Claude Code install above covers it.
 - **Devin CLI**: asks you to trust the folder, loads the skill, then asks
   before it runs `cmack send`; the post lands as soon as you allow it.
 - **OpenCode**: takes the brief as its first message, through its
