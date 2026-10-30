@@ -89,3 +89,23 @@ test('a mention of a recorded seat that is down is reported as down', () => {
   assert.deepEqual(nudged, [{ name: 'lead', ok: false, reason: 'down' }]);
   assert.equal(run.calls.length, 0);
 });
+
+test('mentions: @all names everyone', () => {
+  assert.deepEqual(mentions('@all stand-up in five', ['codex', 'grok']), ['codex', 'grok']);
+});
+
+test('mentions: @all expands to the names given as everyone, in their order, after the names already found', () => {
+  assert.deepEqual(mentions('@grok then @all', ['codex', 'grok', 'devin'], ['devin', 'codex']), ['grok', 'devin', 'codex']);
+});
+
+test('send with @all nudges every seat that is up, never the sender, and reports no down seat', () => {
+  const dir = tmp();
+  join(dir, { name: 'claude', mux: 'cmux', target: 'S1' });
+  join(dir, { name: 'codex', mux: 'cmux', target: 'S2' });
+  join(dir, { name: 'grok', mux: 'cmux', target: 'S3' });
+  recordSeat(dir, { name: 'devin' });
+  const run = fakeRun();
+  const result = send({ dir, from: 'claude', text: '@all builder joined', now: at, run, sleep: noSleep });
+  assert.deepEqual(result.nudged, [{ name: 'codex', ok: true }, { name: 'grok', ok: true }]);
+  assert.deepEqual(run.calls.map((c) => c[1][2]), ['S2', 'S2', 'S3', 'S3']);
+});

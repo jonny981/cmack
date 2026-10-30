@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nudgeLine, detect, adapters, defaultRun } from '../lib/mux.mjs';
+import { nudgeLine, adoptLine, detect, adapters, defaultRun } from '../lib/mux.mjs';
 
 const SOCK = '/tmp/tmux-501/default';
 const TMUX_ENV = { TMUX: `${SOCK},123,0`, TMUX_PANE: '%3' };
@@ -111,4 +111,8 @@ test('defaultRun gives up on a command that hangs', () => {
   const started = Date.now();
   assert.throws(() => defaultRun('sleep', ['5'], { timeout: 200 }));
   assert.ok(Date.now() - started < 2000);
+});
+
+test('adoptLine names the seat and the team folder, and nothing else', () => {
+  assert.equal(adoptLine('builder', '/w/.cmack'), '# cmack: you are builder on the team at /w/.cmack, run cmack team and cmack read');
 });

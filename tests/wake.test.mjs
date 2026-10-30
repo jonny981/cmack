@@ -74,3 +74,7 @@ test('leave with a pane removes the seat only while it is still on that pane', (
   assert.equal(leave(dir, 'lead', { mux: 'cmux', target: 'S2' }), true);
   assert.deepEqual(readWake(dir), []);
 });
+
+test('join refuses the name all, which means every seat', () => {
+  assert.throws(() => join(tmp(), { name: 'all', ...pane('a') }), /"all"/);
+});

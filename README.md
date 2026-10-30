@@ -33,8 +33,9 @@ command does the work. Node 22 or later. No dependencies.
 
    The first one creates `.cmack/` in that folder; every pane opened
    anywhere under it finds the same team. Each agent starts with its name
-   and its brief as its first prompt and says hello in `#general`. A CLI
-   that asks you to trust a new folder asks before it reads the brief.
+   and its brief as its first prompt and says hello in `#general` with
+   `@all`, so every seat that is up gets a nudge. A CLI that asks you to
+   trust a new folder asks before it reads the brief.
 
    The seat is the pane. When the agent exits, the seat is free, `#general`
    gets `<name> is down`, and `cmack resume reviewer` in any pane under the
@@ -50,16 +51,16 @@ command does the work. Node 22 or later. No dependencies.
    cmack 'claude --permission-mode acceptEdits' builder 'build what lead assigns you'
    ```
 
-   To add a teammate from inside a seat, open a pane and start it there,
-   passing the team folder along, because a new tmux pane does not inherit
-   your environment:
-
-   ```bash
-   tmux split-window -d -c "$PWD" -e "CMACK_DIR=$CMACK_DIR" cmack claude builder 'build what lead assigns you'
-   ```
-
-   An agent that is already running joins from inside its own pane with
-   `cmack join <name> [brief]`.
+   Or start the team from inside an agent's pane. Tell the agent you are
+   talking to `/cmack open claude builder 'build what lead assigns you'`:
+   it seats itself, opens a pane beside it, and starts the teammate there.
+   Tell it `/cmack adopt` and it seats every Claude Code, Codex, Grok,
+   Devin or OpenCode pane around it that has no seat yet, each named by
+   its program, and types one line into each pane so that agent knows its
+   name and where the team is. Name them yourself, and any pane at all,
+   with `cmack adopt builder=%3 reviewer=%4` (a tmux pane id, or a cmux
+   surface). An agent that is already running can also join from
+   inside its own pane with `cmack join <name> [brief]`.
 
 2. **Post.** From a seat, or from any other terminal with `--from`:
 
@@ -82,6 +83,8 @@ command does the work. Node 22 or later. No dependencies.
 ```text
 cmack <agent> <name> [brief]              start <agent> in this pane as <name>
 cmack resume <name>                       start a seat again, in this pane
+cmack open <agent> <name> [brief]         open a pane beside you and start <agent> there as <name>
+cmack adopt [<name>=<pane> ...]           seat the agent panes around you, and tell each one
 cmack join <name> [brief]                 join from inside a running agent
 cmack leave [name]                        free a seat
 cmack team                                every seat: agent, up or down, brief
@@ -94,7 +97,9 @@ cmack watch [--as name]
 
 Inside a seat, `send` knows who you are from the pane itself. From a
 terminal that never joined, pass `--from`. A script that cannot reach the
-multiplexer passes `--mux` and `--target` to `join`.
+multiplexer passes `--mux` and `--target` to `join`. `open` and `adopt`
+seat the caller first if it has no seat, as `--as <name>`, else under its
+program's name. `@all` in a message is every seat that is up.
 
 ## Where the team lives
 
@@ -154,7 +159,20 @@ The nudge is one fixed line, then enter:
 
 It carries no message text, so nothing from a message can reach a shell,
 and it starts with a hash, so a pane that has fallen back to a bare shell
-reads it as a comment. In tmux, Cmack checks that the pane still belongs
+reads it as a comment, or, in a zsh that does not read `#` as a comment,
+as one command named `#` that is not found. The line `adopt` types into a
+pane it has seated has the same shape: the seat's name and the team
+folder, nothing free, no semicolon:
+
+```text
+# cmack: you are builder on the team at /work/myproject/.cmack, run cmack team and cmack read
+```
+
+`adopt` reads which program a pane runs through the pane's tty on both
+multiplexers, because tmux's own name for it is the executable's file name
+(a native Claude Code is its version number). On cmux, `open` types the
+start into the new pane's shell, since cmux cannot open a split with a
+command. In tmux, Cmack checks that the pane still belongs
 to the same process, is not scrolled back, and is not a bare shell before
 it types; a pane that is gone, scrolled back or empty is reported, and the
 post stands either way. No multiplexer call may take more than five

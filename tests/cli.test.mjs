@@ -53,7 +53,7 @@ test('cmack <agent> <name> <brief> seats the pane, starts the agent with its bri
   assert.equal(lines[2], `CMACK_DIR=${dir}`);
   assert.equal(lines[3], 'lead\tcmux\tS1');
   assert.deepEqual(readWake(dir), []);
-  assert.match(readChannel(dir, 'general'), /Z lead > lead joined\n\d\d:\d\dZ lead > lead is down\n$/);
+  assert.match(readChannel(dir, 'general'), /Z lead > @all lead joined\n\d\d:\d\dZ lead > lead is down\n$/);
   assert.deepEqual(readTeam(dir), [{ name: 'lead', agent, brief: 'coordinate the team' }]);
   assert.equal(stdout, 'lead is down; cmack resume lead starts it again\n');
 });
@@ -252,7 +252,7 @@ test('join registers the pane and posts to general', () => {
   assert.equal(code, 0);
   assert.equal(stdout, `joined ${dir} as codex (cmux S1)\n`);
   assert.deepEqual(readWake(dir), [{ name: 'codex', mux: 'cmux', target: 'S1' }]);
-  assert.match(readChannel(dir, 'general'), /Z codex > codex joined\n$/);
+  assert.match(readChannel(dir, 'general'), /Z codex > @all codex joined\n$/);
 });
 
 test('join outside a pane fails with the hint', () => {
@@ -371,4 +371,188 @@ test('three concurrent joins all land', async () => {
   const codes = await Promise.all([one('a', 1), one('b', 2), one('c', 3)]);
   assert.deepEqual(codes, [0, 0, 0]);
   assert.deepEqual(readWake(dir).map((e) => e.name).sort(), ['a', 'b', 'c']);
+});
+
+// open and adopt: the multiplexer is scripted. Each pane has a tty, and ps on that tty names its
+// foreground program (a shell alone for command null); the table also answers tmux's alive check.
+const SOCK = '/tmp/tmux-501/default';
+function tmuxScript(panes) {
+  const calls = [];
+  const run = (cmd, args) => {
+    calls.push([cmd, ...args]);
+    if (cmd === 'ps') { const p = panes.find((e) => `/dev/tty${e.id.slice(1)}` === args[1]); return p.command ? `Ss   login\nS    -zsh\nS+   ${p.command}\n` : 'Ss   login\nS+   -zsh\n'; }
+    if (args.includes('split-window')) return '%5\n';
+    if (args.includes('list-panes')) return panes.map((p) => `${p.id}\t${p.pid}\t/dev/tty${p.id.slice(1)}`).join('\n') + '\n';
+    if (args.includes('display-message')) {
+      const p = panes.find((e) => e.id === args[args.indexOf('-t') + 1]);
+      return args.at(-1) === '#{pane_pid}' ? `${p.pid}\n` : `${p.pid} 0 ${p.command ?? 'zsh'}\n`;
+    }
+    return '';
+  };
+  run.calls = calls;
+  return run;
+}
+function cliIn(argv, { dir, env, run }) {
+  let stdout = '';
+  let stderr = '';
+  const code = main(argv, { env: { CMACK_DIR: dir, ...env }, cwd: dir, stdout: { write: (s) => { stdout += s; } }, stderr: { write: (s) => { stderr += s; } }, run, sleep: noSleep });
+  return { code, stdout, stderr };
+}
+const inTmux = { TMUX: `${SOCK},1,0`, TMUX_PANE: '%1' };
+const quoted = (...parts) => parts.map((p) => `'${p}'`).join(' ');
+
+test('open on tmux seats the caller as --as, splits beside it with the team folder and PATH, and runs the start there', () => {
+  const dir = tmp();
+  const agent = fakeAgent(dir);
+  const run = tmuxScript([{ id: '%1', pid: 100, command: 'claude' }]);
+  const { code, stdout } = cliIn(['open', agent, 'builder', 'build', 'it', '--as', 'lead'], { dir, env: { ...inTmux, PATH: '/p' }, run });
+  assert.equal(code, 0);
+  assert.equal(stdout, 'opened builder in %5; it joins when its agent starts\n');
+  assert.deepEqual(readWake(dir), [{ name: 'lead', mux: 'tmux', target: `${SOCK},%1,100` }]);
+  assert.match(readChannel(dir, 'general'), /Z lead > @all lead joined\n$/);
+  assert.deepEqual(run.calls.find((c) => c.includes('split-window')), ['tmux', '-S', SOCK, 'split-window', '-d', '-t', '%1', '-c', dir, '-e', `CMACK_DIR=${dir}`, '-e', 'PATH=/p', '-P', '-F', '#{pane_id}', quoted(process.execPath, BIN, agent, 'builder', 'build it')]);
+});
+
+test('open on cmux splits right and types the start into the new pane', () => {
+  const dir = tmp();
+  const agent = fakeAgent(dir);
+  const calls = [];
+  const run = (cmd, args) => {
+    calls.push([cmd, ...args]);
+    if (args[0] === 'new-split') return 'OK surface:36 workspace:13\n';
+    return '';
+  };
+  const { code, stdout } = cli(['open', agent, 'builder', 'go', '--as', 'lead'], { dir, run });
+  assert.equal(code, 0);
+  assert.equal(stdout, 'opened builder in surface:36; it joins when its agent starts\n');
+  assert.deepEqual(calls.find((c) => c[1] === 'new-split'), ['cmux', 'new-split', 'right', '--surface', 'S1', '--focus', 'false']);
+  assert.equal(calls.filter((c) => c[1] === 'tree').length, 0);
+  assert.deepEqual(calls.at(-2), ['cmux', 'send', '--surface', 'surface:36', `cd '${dir}' && CMACK_DIR='${dir}' ${quoted(process.execPath, BIN, agent, 'builder', 'go')}`]);
+  assert.deepEqual(calls.at(-1), ['cmux', 'send-key', '--surface', 'surface:36', 'enter']);
+});
+
+test('open from a seated pane keeps the seat and posts no second join', () => {
+  const dir = tmp();
+  const agent = fakeAgent(dir);
+  cli(['join', 'lead'], { dir });
+  const run = (cmd, args) => (args[0] === 'new-split' ? 'OK surface:36 workspace:13\n' : '');
+  assert.equal(cli(['open', agent, 'builder'], { dir, run }).code, 0);
+  assert.deepEqual(readWake(dir), [{ name: 'lead', mux: 'cmux', target: 'S1' }]);
+  assert.equal(readChannel(dir, 'general').split('joined').length - 1, 1);
+});
+
+test('open with an agent that is not found opens no pane', () => {
+  const dir = tmp();
+  const calls = [];
+  const run = (cmd, args) => { calls.push(args[0]); return ''; };
+  const { code, stderr } = cli(['open', 'frobnicate', 'x', '--as', 'lead'], { dir, run });
+  assert.equal(code, 127);
+  assert.equal(stderr, 'cmack: frobnicate: command not found; cmack --help lists the commands\n');
+  assert.ok(!calls.includes('new-split'));
+  assert.deepEqual(readWake(dir), []);
+});
+
+test('adopt on tmux seats every agent pane in the window under its program name, numbers a repeat, skips shells, editors and the caller, and tells each', () => {
+  const dir = tmp();
+  const run = tmuxScript([
+    { id: '%1', pid: 100, command: 'claude' },
+    { id: '%2', pid: 200, command: null },
+    { id: '%3', pid: 300, command: 'codex' },
+    { id: '%4', pid: 400, command: 'claude' },
+    { id: '%5', pid: 500, command: 'vim' },
+  ]);
+  const { code, stdout, stderr } = cliIn(['adopt'], { dir, env: inTmux, run });
+  assert.equal(code, 0);
+  assert.equal(stderr, '');
+  assert.equal(stdout, 'adopted codex (%3, codex)\nadopted claude-2 (%4, claude)\n');
+  assert.deepEqual(readWake(dir), [
+    { name: 'claude', mux: 'tmux', target: `${SOCK},%1,100` },
+    { name: 'codex', mux: 'tmux', target: `${SOCK},%3,300` },
+    { name: 'claude-2', mux: 'tmux', target: `${SOCK},%4,400` },
+  ]);
+  assert.deepEqual(readTeam(dir).map((s) => s.name), ['claude', 'codex', 'claude-2']);
+  const typed = run.calls.filter((c) => c.includes('send-keys') && c.includes('-l')).map((c) => [c[5], c.at(-1)]);
+  assert.deepEqual(typed, [
+    ['%3', `# cmack: you are codex on the team at ${dir}, run cmack team and cmack read`],
+    ['%4', `# cmack: you are claude-2 on the team at ${dir}, run cmack team and cmack read`],
+  ]);
+  assert.match(readChannel(dir, 'general'), /Z claude > @all claude joined\n\d\d:\d\dZ claude > claude adopted codex, claude-2\n$/);
+  const again = cliIn(['adopt'], { dir, env: inTmux, run });
+  assert.equal(again.code, 1);
+  assert.equal(again.stderr, 'cmack: every agent pane around you is already seated\n');
+  assert.deepEqual(readWake(dir).map((e) => e.name), ['claude', 'codex', 'claude-2']);
+});
+
+test('a bad name, your own pane or your own name stops open and adopt before anything is written', () => {
+  const dir = tmp();
+  const agent = fakeAgent(dir);
+  const run = tmuxScript([{ id: '%1', pid: 100, command: 'claude' }, { id: '%3', pid: 300, command: 'codex' }]);
+  const open = cliIn(['open', agent, 'all', '--as', 'lead'], { dir, env: inTmux, run });
+  assert.equal(open.code, 2);
+  assert.match(open.stderr, /"all" is every seat/);
+  assert.equal(cliIn(['adopt', 'builder=%3', 'all=%1', '--as', 'lead'], { dir, env: inTmux, run }).code, 2);
+  assert.equal(cliIn(['adopt', 'helper=%1', '--as', 'lead'], { dir, env: inTmux, run }).stderr, 'cmack: %1 is your own pane\n');
+  assert.equal(cliIn(['adopt', 'lead=%3', '--as', 'lead'], { dir, env: inTmux, run }).stderr, 'cmack: lead is your own name\n');
+  assert.deepEqual(readWake(dir), []);
+  assert.equal(readChannel(dir, 'general'), '');
+  assert.ok(!run.calls.some((c) => c.includes('split-window') || c.includes('send-keys')));
+});
+
+test('adopt with names seats only the named panes, and a pane that is not around you stops it before anything is written', () => {
+  const dir = tmp();
+  const run = tmuxScript([{ id: '%1', pid: 100, command: 'claude' }, { id: '%3', pid: 300, command: 'codex' }, { id: '%4', pid: 400, command: 'grok' }]);
+  const missing = cliIn(['adopt', 'reviewer=%9', '--as', 'lead'], { dir, env: inTmux, run });
+  assert.equal(missing.code, 2);
+  assert.equal(missing.stderr, 'cmack: no pane %9 around you\n');
+  assert.deepEqual(readWake(dir), []);
+  const { code, stdout } = cliIn(['adopt', 'reviewer=%4', '--as', 'lead'], { dir, env: inTmux, run });
+  assert.equal(code, 0);
+  assert.equal(stdout, 'adopted reviewer (%4, grok)\n');
+  assert.deepEqual(readWake(dir).map((e) => e.name), ['lead', 'reviewer']);
+});
+
+test('adopt with nothing around you says so and seats nobody', () => {
+  const dir = tmp();
+  const run = tmuxScript([{ id: '%1', pid: 100, command: 'claude' }, { id: '%2', pid: 200, command: null }, { id: '%6', pid: 600, command: 'htop' }]);
+  const { code, stderr } = cliIn(['adopt'], { dir, env: inTmux, run });
+  assert.equal(code, 1);
+  assert.equal(stderr, 'cmack: no agent pane around you to adopt\n');
+  assert.deepEqual(readWake(dir), []);
+});
+
+test('adopt on cmux reads each surface in the workspace through its tty, skips a shell and a surface with no tty, and tells the agent', () => {
+  const dir = tmp();
+  const tree = [
+    'window window:1 UUID-W [current]',
+    '└── workspace workspace:13 UUID-WS "team"',
+    '    ├── pane pane:30 UUID-P30 [focused]',
+    '    │   └── surface surface:30 S1 [terminal] "me" [selected] ◀ here tty=ttys007',
+    '    ├── pane pane:18 UUID-P18',
+    '    │   └── surface surface:18 UUID-18 [terminal] "devin" [selected] tty=ttys012',
+    '    ├── pane pane:19 UUID-P19',
+    '    │   └── surface surface:19 UUID-19 [terminal] "notes on tty=ttys099" [selected] tty=ttys013',
+    '    └── pane pane:36 UUID-P36',
+    '        └── surface surface:36 UUID-36 [terminal] "Terminal" [selected]',
+    '',
+  ].join('\n');
+  const ps = {
+    ttys007: 'S+   caffeinate\nSs   /usr/bin/login\nS    -/bin/zsh\nS+   /Users/x/.local/bin/claude\nS+   node\n',
+    ttys012: 'Ss   login\nS    -zsh\nS+   devin\n',
+    ttys013: 'Ss   login\nS+   -zsh\n',
+  };
+  const calls = [];
+  const run = (cmd, args) => {
+    calls.push([cmd, ...args]);
+    if (args[0] === 'identify') return '{"caller":{"workspace_ref":"workspace:13","surface_id":"S1"}}\n';
+    if (args[0] === 'tree') return tree;
+    if (cmd === 'ps') return ps[args[1]];
+    return '';
+  };
+  const { code, stdout } = cli(['adopt'], { dir, run });
+  assert.equal(code, 0);
+  assert.equal(stdout, 'adopted devin (surface:18, devin)\n');
+  assert.deepEqual(readWake(dir), [{ name: 'claude', mux: 'cmux', target: 'S1' }, { name: 'devin', mux: 'cmux', target: 'UUID-18' }]);
+  assert.deepEqual(calls.find((c) => c[1] === 'tree'), ['cmux', 'tree', '--workspace', 'workspace:13', '--id-format', 'both']);
+  assert.deepEqual(calls.at(-2), ['cmux', 'send', '--surface', 'UUID-18', `# cmack: you are devin on the team at ${dir}, run cmack team and cmack read`]);
+  assert.deepEqual(calls.at(-1), ['cmux', 'send-key', '--surface', 'UUID-18', 'enter']);
 });
