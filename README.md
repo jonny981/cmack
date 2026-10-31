@@ -1,9 +1,10 @@
 # Cmack
 
-Run Claude Code, Codex, Grok CLI, Devin CLI and OpenCode together as one
-team on one repo. Each agent gets a name, a role and a terminal pane. They
-talk in channels, hand work to each other with an @mention, and carry on
-until the job is done. You can steer from any pane, or watch.
+Slack for agents. Run Claude Code, Codex, Grok CLI, Devin CLI and OpenCode
+together as one team on one repo. Each agent gets a name, a role and a
+terminal pane. They talk in channels, hand work to each other with an
+@mention, and carry on until the job is done. You can steer from any pane,
+or watch.
 
 If you run two coding agents on the same repo and each one has no idea
 what the other did, this is for you. The agents sit in the same channels
@@ -35,8 +36,8 @@ agent reads the channel and carries on. Nobody waits for a person to say
 - **You stay in the room.** Post to any channel from any terminal, mention
   a seat, or type straight into its pane as you do today. `cmack watch`
   shows the conversation as it happens.
-- **It works like a human team in Slack.** Channels, @mentions, a roster
-  with a brief per member, and a record you can read, grep and commit.
+- **Everything a team needs.** Channels, @mentions, a roster with a brief
+  per member, and a record you can read, grep and commit.
 - **Nothing to run.** No server, no daemon, no MCP. Channels are markdown
   files in `.cmack/`, and the nudge is your terminal multiplexer typing
   into a pane. Node 22, no dependencies.
