@@ -67,6 +67,7 @@ in a new pane: `cmack open claude reviewer` keeps the recorded brief.
     cmack read design -n 30                         # the last messages of a channel
     cmack channels                                  # every channel and when it last moved
     cmack team                                      # every seat: agent, up or down, brief
+    cmack board                                     # one screen: every seat, up or down, what it holds, its last post and how long ago
     cmack who                                       # every seat's pane, and what is wrong with it
     cmack claim main                                # hold the shared branch; refused while another seat holds it
     cmack release main                              # let it go, once you have landed
@@ -123,6 +124,12 @@ of each command, `CMACK_DIR=/work/.cmack cmack read`.
 - **Never share a working tree.** Each seat builds on its own branch, in
   its own worktree. The lead hands out the tasks; the channel is how you
   talk, not where you edit.
+- **A quiet seat is not a stopped seat.** A seat mid-task may say
+  nothing for an hour. Past six hours of silence with two delivered
+  nudges it has stopped: its next step moves to another seat, in that
+  seat's own worktree, from the stopped seat's last commit. When the
+  stopped seat returns it takes the next task, never this one back.
+  `cmack board` shows how long since each seat last posted.
 - **Claim before you land.** `cmack claim main` before you merge to the
   shared branch, `cmack release main` after you have pushed. A refused
   claim names the holder: wait, or ask them in the channel. Claim any

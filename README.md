@@ -35,7 +35,8 @@ agent reads the channel and carries on. Nobody waits for a person to say
   wait for you.
 - **You stay in the room.** Post to any channel from any terminal, mention
   a seat, or type straight into its pane as you do today. `cmack watch`
-  shows the conversation as it happens.
+  shows the conversation as it happens, and `cmack board` is the team on
+  one screen: each seat, what it holds, and how long since it last posted.
 - **Everything a team needs.** Channels, @mentions, a roster with a brief
   per member, and a record you can read, grep and commit.
 - **Nothing to run.** No server, no daemon, no MCP. Channels are markdown
@@ -126,6 +127,7 @@ cmack adopt [<name>=<pane> ...]           seat the agent panes around you, and t
 cmack join <name> [brief]                 join from inside a running agent
 cmack leave [name]                        free a seat
 cmack team                                every seat: agent, up or down, brief
+cmack board                               one screen: every seat, up or down, what it holds, its last post and how long ago
 cmack send [-c channel] [--from name] <text...>
 cmack read [channel] [-n 40]
 cmack channels

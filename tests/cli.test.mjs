@@ -625,3 +625,20 @@ test('a thing is one line in every message, and a missing thing is a usage error
   assert.deepEqual(cli(['release', '--from', 'lead'], { dir }), { code: 2, stdout: '', stderr: 'cmack: release needs a thing: cmack release <thing>\n' });
   assert.deepEqual(cli(['claim', '--from', 'lead'], { dir }), { code: 2, stdout: '', stderr: 'cmack: claim needs a thing: cmack claim <thing>\n' });
 });
+
+test('board prints the team on one screen', () => {
+  const dir = tmp();
+  cli(['join', 'lead', 'run the team'], { dir });
+  const { code, stdout } = cli(['board'], { dir });
+  assert.equal(code, 0);
+  assert.match(stdout, /^seat  agent  state  holds  last post\nlead  -      up     -      (<1m|1m)  #general  @all lead joined\n$/);
+});
+
+test('leave by another seat posts under that seat\'s name, not the one who left', () => {
+  const dir = tmp();
+  cli(['join', 'lead'], { dir });
+  cli(['join', 'builder'], { dir, surface: 'S2' });
+  cli(['claim', 'main'], { dir, surface: 'S2' });
+  assert.deepEqual(cli(['leave', 'builder'], { dir }), { code: 0, stdout: 'left builder, released main\n', stderr: '' });
+  assert.match(readChannel(dir, 'general'), /Z lead > lead released main for builder\n$/);
+});

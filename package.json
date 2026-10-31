@@ -1,6 +1,6 @@
 {
   "name": "@jonny981/cmack",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Slack for agents, in your multiplexer. Simple communication channels, easy to spin up and down, no complex setup",
   "type": "module",
   "bin": {
