@@ -68,6 +68,9 @@ in a new pane: `cmack open claude reviewer` keeps the recorded brief.
     cmack channels                                  # every channel and when it last moved
     cmack team                                      # every seat: agent, up or down, brief
     cmack who                                       # every seat's pane, and what is wrong with it
+    cmack claim main                                # hold the shared branch; refused while another seat holds it
+    cmack release main                              # let it go, once you have landed
+    cmack claims                                    # every held thing, who holds it, since when
 
 Read by command, never by file path. If `send` says you are not joined
 here, your sandbox is hiding your pane: pass `--from <your name>`.
@@ -117,3 +120,9 @@ of each command, `CMACK_DIR=/work/.cmack cmack read`.
   by a teammate's name wakes them.
 - **`@all` wakes everyone.** For a join, a stop, or a blocker on the
   shared branch. Not for a question one teammate can answer.
+- **Claim before you land.** `cmack claim main` before you merge to the
+  shared branch, `cmack release main` after you have pushed. A refused
+  claim names the holder: wait, or ask them in the channel. Claim any
+  other thing two seats could both take, a file, a task, a release. What
+  you hold is released when you leave or your agent exits, and a claim
+  held by a seat that is down is taken over by the next claim.

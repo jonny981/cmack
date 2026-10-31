@@ -556,3 +556,72 @@ test('adopt on cmux reads each surface in the workspace through its tty, skips a
   assert.deepEqual(calls.at(-2), ['cmux', 'send', '--surface', 'UUID-18', `# cmack: you are devin on the team at ${dir}, run cmack team and cmack read`]);
   assert.deepEqual(calls.at(-1), ['cmux', 'send-key', '--surface', 'UUID-18', 'enter']);
 });
+
+test('claim posts to #general, a second claim by another seat is refused with the holder, claims lists it, release posts', () => {
+  const dir = tmp();
+  assert.deepEqual(cli(['claim', 'main', '--from', 'lead'], { dir }), { code: 0, stdout: 'lead holds main\n', stderr: '' });
+  const refused = cli(['claim', 'main', '--from', 'builder'], { dir });
+  assert.equal(refused.code, 1);
+  assert.match(refused.stderr, /^cmack: main is held by lead since \d{4}-\d\d-\d\dT\d\d:\d\dZ\n$/);
+  assert.match(cli(['claims'], { dir }).stdout, /^main\tlead\t\d{4}-\d\d-\d\dT\d\d:\d\dZ\n$/);
+  assert.deepEqual(cli(['release', 'main', '--from', 'builder'], { dir }), { code: 0, stdout: 'main released, lead held it\n', stderr: '' });
+  assert.equal(cli(['release', 'main', '--from', 'builder'], { dir }).code, 1);
+  assert.equal(cli(['claims'], { dir }).stdout, '');
+  assert.match(readChannel(dir, 'general'), /Z lead > lead claimed main\n\d\d:\d\dZ builder > builder released main, lead held it\n$/);
+});
+
+test('a seat that goes down releases what it held, and the down post says so', () => {
+  const dir = tmp();
+  const agent = fakeAgentThat(dir, 'CMACK_DIR="$CMACK_DIR" "$CMACK_NODE" "$CMACK_BIN" claim main --from lead >/dev/null; exit 0');
+  const { code, stdout } = cli([agent, 'lead'], { dir, env: { CMACK_BIN: BIN, CMACK_NODE: process.execPath } });
+  assert.equal(code, 0);
+  assert.equal(cli(['claims'], { dir }).stdout, '');
+  assert.match(readChannel(dir, 'general'), /Z lead > lead claimed main\n\d\d:\d\dZ lead > lead is down, released main\n$/);
+  assert.equal(stdout, 'lead is down; cmack resume lead starts it again\n');
+});
+
+test('leave releases what the seat held', () => {
+  const dir = tmp();
+  cli(['join', 'lead'], { dir });
+  cli(['claim', 'main'], { dir });
+  assert.deepEqual(cli(['leave'], { dir }), { code: 0, stdout: 'left lead, released main\n', stderr: '' });
+  assert.equal(cli(['claims'], { dir }).stdout, '');
+  assert.match(readChannel(dir, 'general'), /Z lead > lead released main\n$/);
+});
+
+test('a claim held by a seat that is down is taken over, and the post says so; a holder with no seat is never taken over', () => {
+  const dir = tmp();
+  cli(['join', 'builder'], { dir, surface: 'S2' });
+  cli(['claim', 'main'], { dir, surface: 'S2' });
+  fs.writeFileSync(path.join(dir, 'wake.txt'), '');
+  assert.deepEqual(cli(['claim', 'main', '--from', 'lead'], { dir }), { code: 0, stdout: 'lead holds main, builder held it and is down\n', stderr: '' });
+  assert.match(readChannel(dir, 'general'), /Z lead > lead claimed main, builder held it and is down\n$/);
+  assert.equal(cli(['claim', 'main', '--from', 'jonny'], { dir }).code, 1);
+});
+
+test('a bad --from name claims and releases nothing', () => {
+  const dir = tmp();
+  assert.equal(cli(['claim', 'main', '--from', 'lead\nevil\tbuilder\t2020'], { dir }).code, 2);
+  assert.equal(cli(['claims'], { dir }).stdout, '');
+  cli(['claim', 'main', '--from', 'lead'], { dir });
+  assert.equal(cli(['release', 'main', '--from', 'x y'], { dir }).code, 2);
+  assert.match(cli(['claims'], { dir }).stdout, /^main\tlead\t/);
+});
+
+test('leave releases the claims of a seat whose pane entry was taken over', () => {
+  const dir = tmp();
+  cli(['join', 'lead'], { dir });
+  cli(['claim', 'main'], { dir });
+  cli(['join', 'builder'], { dir });
+  assert.deepEqual(cli(['leave', 'lead'], { dir }), { code: 0, stdout: 'left lead, released main\n', stderr: '' });
+  assert.equal(cli(['claims'], { dir }).stdout, '');
+  assert.equal(cli(['leave', 'lead'], { dir }).code, 1);
+});
+
+test('a thing is one line in every message, and a missing thing is a usage error', () => {
+  const dir = tmp();
+  assert.equal(cli(['claim', 'auth  fix', '--from', 'lead'], { dir }).stdout, 'lead holds auth fix\n');
+  assert.equal(cli(['release', 'auth  fix', '--from', 'lead'], { dir }).code, 0);
+  assert.deepEqual(cli(['release', '--from', 'lead'], { dir }), { code: 2, stdout: '', stderr: 'cmack: release needs a thing: cmack release <thing>\n' });
+  assert.deepEqual(cli(['claim', '--from', 'lead'], { dir }), { code: 2, stdout: '', stderr: 'cmack: claim needs a thing: cmack claim <thing>\n' });
+});

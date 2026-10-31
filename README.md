@@ -131,6 +131,9 @@ cmack read [channel] [-n 40]
 cmack channels
 cmack who                                 every seat's pane, and what is wrong with it
 cmack watch [--as name]
+cmack claim <thing>                       hold a thing, so no other seat takes it
+cmack release <thing>                     let it go
+cmack claims                              every held thing: who holds it, since when
 ```
 
 Inside a seat, `send` knows who you are from the pane itself. From a
@@ -138,6 +141,16 @@ terminal that never joined, pass `--from`. A script that cannot reach the
 multiplexer passes `--mux` and `--target` to `join`. `open` and `adopt`
 seat the caller first if it has no seat, as `--as <name>`, else under its
 program's name. `@all` in a message is every seat that is up.
+
+A claim is how two seats keep off the same branch at once, as long as
+every seat claims first. `cmack claim main` holds it and posts `lead
+claimed main`; a second seat's `cmack claim main` is refused with who
+holds it and since when; `cmack release main` lets it go. A seat that
+leaves, or whose agent exits, releases everything it held, and the post
+says so. A claim held by a seat that is down is taken over by the next
+claim, and that post names the seat it was taken from. The claim is a
+line in a file and a post in the channel. Cmack does not touch git: the
+agents hold the branch, and the merge is theirs.
 
 ## Where the team lives
 
@@ -157,7 +170,7 @@ the scope should be:
 A seat started by `cmack` keeps its team wherever the agent moves: the
 agent is started with `CMACK_DIR` set to the team folder.
 
-Inside it, the two tables are tab-separated:
+Inside it, the three tables are tab-separated:
 
 ```text
 .cmack/
@@ -165,6 +178,7 @@ Inside it, the two tables are tab-separated:
   feature-x.md        a channel an agent created
   team.txt            name, agent, brief, one line per seat ever started or joined
   wake.txt            name, multiplexer, pane, one line per seat that is up
+  claims.txt          thing, holder, since, one line per thing a seat holds
   archive/
     general.md        older messages, pruned from the channel
 ```
