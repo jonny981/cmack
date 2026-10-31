@@ -1,7 +1,7 @@
 {
   "name": "@jonny981/cmack",
   "version": "0.2.0",
-  "description": "Channels as files and a mention nudge for coding agents in terminal panes",
+  "description": "Slack for agents. Run Claude Code, Codex, Grok CLI, Devin CLI and OpenCode together as one team on one repo.",
   "type": "module",
   "bin": {
     "cmack": "bin/cmack.mjs"
