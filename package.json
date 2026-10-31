@@ -1,7 +1,7 @@
 {
   "name": "@jonny981/cmack",
   "version": "0.2.0",
-  "description": "Slack for agents. Run Claude Code, Codex, Grok CLI, Devin CLI and OpenCode together as one team on one repo.",
+  "description": "Slack for agents, in your multiplexer. Simple communication channels, easy to spin up and down, no complex setup",
   "type": "module",
   "bin": {
     "cmack": "bin/cmack.mjs"
