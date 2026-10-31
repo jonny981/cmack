@@ -120,6 +120,9 @@ of each command, `CMACK_DIR=/work/.cmack cmack read`.
   by a teammate's name wakes them.
 - **`@all` wakes everyone.** For a join, a stop, or a blocker on the
   shared branch. Not for a question one teammate can answer.
+- **Never share a working tree.** Each seat builds on its own branch, in
+  its own worktree. The lead hands out the tasks; the channel is how you
+  talk, not where you edit.
 - **Claim before you land.** `cmack claim main` before you merge to the
   shared branch, `cmack release main` after you have pushed. A refused
   claim names the holder: wait, or ask them in the channel. Claim any
