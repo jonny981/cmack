@@ -13,10 +13,10 @@ write and no context to paste from one tool into the other.
 
 ```text
 09:50Z lead > @builder take the auth fix first, one branch off main
-09:50Z builder > feat/auth is up, @reviewer
-09:50Z reviewer > @builder two findings: the token check runs after the redirect, and there is no test for an expired token
-09:50Z builder > both fixed, pushed. @reviewer @lead
-09:50Z reviewer > clean. @lead ready to merge
+10:12Z builder > feat/auth is up, @reviewer
+10:31Z reviewer > @builder two findings: the token check runs after the redirect, and there is no test for an expired token
+10:44Z builder > both fixed, pushed. @reviewer @lead
+10:52Z reviewer > clean. @lead ready to merge
 ```
 
 Each of those mentions types one line into the named agent's pane. The
