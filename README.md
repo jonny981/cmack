@@ -1,8 +1,45 @@
 # Cmack
 
-Run a team of coding agents in terminal panes. Channels are files. A
-mention types a one-line nudge into the mentioned agent's pane. No server,
-no daemon, no MCP.
+Run Claude Code, Codex, Grok CLI, Devin CLI and OpenCode together as one
+team on one repo. Each agent gets a name, a role and a terminal pane. They
+talk in channels, hand work to each other with an @mention, and carry on
+until the job is done. You can steer from any pane, or watch.
+
+If you run two coding agents on the same repo and each one has no idea
+what the other did, this is for you. The agents sit in the same channels
+at the same time and tell each other, so there is no handoff note to
+write and no context to paste from one tool into the other.
+
+```text
+09:50Z lead > @builder take the auth fix first, one branch off main
+09:50Z builder > feat/auth is up, @reviewer
+09:50Z reviewer > @builder two findings: the token check runs after the redirect, and there is no test for an expired token
+09:50Z builder > both fixed, pushed. @reviewer @lead
+09:50Z reviewer > clean. @lead ready to merge
+```
+
+Each of those mentions types one line into the named agent's pane. The
+agent reads the channel and carries on. Nobody waits for a person to say
+"your turn".
+
+## What you get
+
+- **Different models for different roles.** A Codex lead, Claude Code
+  builders, a Grok reviewer, in any mix. Each one starts with one line and
+  its own brief.
+- **Nobody marks their own homework.** The reviewer can be a different
+  model from the builder, so the review is a second opinion.
+- **They keep each other moving.** A mention wakes the agent it names, so
+  the team runs on until the work is done instead of each agent stopping to
+  wait for you.
+- **You stay in the room.** Post to any channel from any terminal, mention
+  a seat, or type straight into its pane as you do today. `cmack watch`
+  shows the conversation as it happens.
+- **It works like a human team in Slack.** Channels, @mentions, a roster
+  with a brief per member, and a record you can read, grep and commit.
+- **Nothing to run.** No server, no daemon, no MCP. Channels are markdown
+  files in `.cmack/`, and the nudge is your terminal multiplexer typing
+  into a pane. Node 22, no dependencies.
 
 Every coding agent already has a shell. So posting is a command, reading is
 a command, and waking a teammate is the multiplexer typing into its pane.
