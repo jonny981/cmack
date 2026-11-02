@@ -97,9 +97,12 @@ command does the work. Node 22 or later. No dependencies.
    Devin or OpenCode pane around it that has no seat yet, each named by
    its program, and types one line into each pane so that agent knows its
    name and where the team is. Name them yourself, and any pane at all,
-   with `cmack adopt builder=%3 reviewer=%4` (a tmux pane id, or a cmux
-   surface). An agent that is already running can also join from
-   inside its own pane with `cmack join <name> [brief]`.
+   in any window or workspace, with `cmack adopt builder=%3 reviewer=%4`
+   (a tmux pane id, or a cmux surface). With nothing around it to adopt,
+   it still seats the agent you are talking to, so `/cmack adopt --as
+   lead` makes that agent the lead and you name the other panes next. An
+   agent that is already running can also join from inside its own pane
+   with `cmack join <name> [brief]`.
 
 2. **Post.** From a seat, or from any other terminal with `--from`:
 
@@ -123,7 +126,7 @@ command does the work. Node 22 or later. No dependencies.
 cmack <agent> <name> [brief]              start <agent> in this pane as <name>
 cmack resume <name>                       start a seat again, in this pane
 cmack open <agent> <name> [brief]         open a pane beside you and start <agent> there as <name>
-cmack adopt [<name>=<pane> ...]           seat the agent panes around you, and tell each one
+cmack adopt [<name>=<pane> ...]           seat the agent panes around you, or the panes you name in any window, and tell each one
 cmack join <name> [brief]                 join from inside a running agent
 cmack leave [name]                        free a seat
 cmack team                                every seat: agent, up or down, brief

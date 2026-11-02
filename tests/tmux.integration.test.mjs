@@ -67,11 +67,12 @@ test('adopt seats a real neighbouring tmux pane and the line lands in it', (t) =
   try { defaultRun('tmux', ['-V']); } catch { t.skip('tmux is not installed'); return; }
   const { dir, pane, env } = session();
   try {
-    const other = tmux('split-window', '-d', '-t', pane, '-P', '-F', '#{pane_id}', 'cat').trim();
+    // The helper lives in another window, which only the named form can reach.
+    const other = tmux('new-window', '-d', '-P', '-F', '#{pane_id}', 'cat').trim();
     assert.ok(until(() => tmux('display-message', '-p', '-t', other, '#{pane_current_command}').trim() === 'cat'));
-    // cat is no agent CLI, so a bare adopt takes nothing; named, any pane goes.
-    assert.equal(main(['adopt', '--as', 'lead'], { env, cwd: dir, run: defaultRun, stdout: quiet, stderr: quiet }), 1);
-    assert.ok(!fs.existsSync(path.join(dir, 'wake.txt')));
+    // cat is no agent CLI, so a bare adopt takes nothing and only seats the caller; named, any pane goes.
+    assert.equal(main(['adopt', '--as', 'lead'], { env, cwd: dir, run: defaultRun, stdout: quiet, stderr: quiet }), 0);
+    assert.match(fs.readFileSync(path.join(dir, 'wake.txt'), 'utf8'), new RegExp(`^lead\ttmux\t.*,${pane},\\d+\n$`));
     let stdout = '';
     assert.equal(main(['adopt', `helper=${other}`, '--as', 'lead'], { env, cwd: dir, run: defaultRun, stdout: { write: (s) => { stdout += s; } }, stderr: quiet }), 0);
     assert.equal(stdout, `adopted helper (${other}, cat)\n`);
