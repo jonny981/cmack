@@ -43,12 +43,13 @@ To take the agents already running in the panes around you onto the team:
 
     cmack adopt                            # every claude, codex, grok, devin or opencode pane in your window, named by its program
     cmack adopt builder=%3 reviewer=%4     # only these panes, under these names; any pane, any program, any window or workspace
+    cmack adopt reviewer=billing           # a pane by part of its title (tmux: window name or pane title; cmux: workspace or surface title); any case; one match, an exact title first
 
 With no names, a pane that already has a seat is left alone, and a second
 pane running the same program gets a number: `claude`, `claude-2`. To name
-them, find the pane ids first, every window included (`tmux list-panes -a
--F '#{pane_id} #{window_name} #{pane_current_command}'` or `cmux tree
---all`) and pass `name=pane`. Each adopted pane is told, with one line typed
+them, find the pane ids or titles first, every window included (`tmux
+list-panes -a -F '#{pane_id} #{window_name} #{pane_title}'` or `cmux tree
+--all`) and pass `name=pane`, the pane being its id or part of its title. Each adopted pane is told, with one line typed
 into it. Then post in `#general` what each adopted seat is on, with its
 name, since adopt records no brief.
 
@@ -56,7 +57,7 @@ If you have no seat yet, `open` and `adopt` seat you first, under the name
 the person gave you: add `--as <name>`. Without it you are seated under
 your program's name. A bare `adopt` with no agent pane around you still
 seats you and says so; the person then names panes from other windows or
-workspaces with `name=pane`.
+workspaces with `name=pane`, by id or by part of a title.
 
 A seat whose agent has exited shows as down in `cmack team`; `cmack resume
 <name>` starts it again with the same brief, and `cmack open` can start it

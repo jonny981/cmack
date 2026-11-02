@@ -382,7 +382,7 @@ function tmuxScript(panes) {
     calls.push([cmd, ...args]);
     if (cmd === 'ps') { const p = panes.find((e) => `/dev/tty${e.id.slice(1)}` === args[1]); return p.command ? `Ss   login\nS    -zsh\nS+   ${p.command}\n` : 'Ss   login\nS+   -zsh\n'; }
     if (args.includes('split-window')) return '%5\n';
-    if (args.includes('list-panes')) return panes.filter((p) => args.includes('-a') || !p.elsewhere).map((p) => `${p.id}\t${p.pid}\t/dev/tty${p.id.slice(1)}`).join('\n') + '\n';
+    if (args.includes('list-panes')) return panes.filter((p) => args.includes('-a') || !p.elsewhere).map((p) => `${p.id}\t${p.pid}\t/dev/tty${p.id.slice(1)}\t${p.window ?? ''}\t${p.title ?? ''}`).join('\n') + '\n';
     if (args.includes('display-message')) {
       const p = panes.find((e) => e.id === args[args.indexOf('-t') + 1]);
       return args.at(-1) === '#{pane_pid}' ? `${p.pid}\n` : `${p.pid} 0 ${p.command ?? 'zsh'}\n`;
@@ -593,6 +593,64 @@ test('adopt on cmux reads each surface in the workspace through its tty, skips a
   assert.deepEqual(calls.find((c) => c[1] === 'tree'), ['cmux', 'tree', '--workspace', 'workspace:13', '--id-format', 'both']);
   assert.deepEqual(calls.at(-2), ['cmux', 'send', '--surface', 'UUID-18', `# cmack: you are devin on the team at ${dir}, run cmack team and cmack read`]);
   assert.deepEqual(calls.at(-1), ['cmux', 'send-key', '--surface', 'UUID-18', 'enter']);
+});
+
+test('adopt names a tmux pane by part of its window name or pane title, any case; an exact title wins; two matches, a shared pane and a bad argument are refused', () => {
+  const dir = tmp();
+  const run = tmuxScript([
+    { id: '%1', pid: 100, command: 'claude', window: 'work', title: 'me' },
+    { id: '%3', pid: 300, command: 'codex', window: 'work', title: 'billing refunds', elsewhere: true },
+    { id: '%4', pid: 400, command: 'grok', window: 'work', title: 'cache invalidation', elsewhere: true },
+    { id: '%6', pid: 600, command: 'codex', window: 'work', title: 'cache', elsewhere: true },
+    { id: '%5', pid: 500, command: 'opencode', window: 'host', title: os.hostname(), elsewhere: true },
+  ]);
+  const refused = (argv, stderr) => {
+    const r = cliIn(['adopt', ...argv, '--as', 'lead'], { dir, env: inTmux, run });
+    assert.equal(r.code, 2, stderr);
+    assert.equal(r.stderr, stderr);
+  };
+  refused(['helper=work'], 'cmack: "work" is 3 panes: %3 "work / billing refunds", %4 "work / cache invalidation", %6 "work / cache"; name one by its id\n');
+  refused(['helper=nothing'], 'cmack: no pane nothing in tmux\n');
+  refused([`helper=${os.hostname()}`], `cmack: no pane ${os.hostname()} in tmux\n`);
+  refused(['a=billing', 'b=refunds'], 'cmack: a and b are both %3\n');
+  refused(['billing'], 'cmack: billing: name a pane as <name>=<pane>\n');
+  refused(['=billing'], 'cmack: =billing: name a pane as <name>=<pane>\n');
+  refused(['reviewer='], 'cmack: reviewer=: name a pane as <name>=<pane>\n');
+  assert.deepEqual(readWake(dir), []);
+  const { code, stdout } = cliIn(['adopt', 'reviewer=BILLING', 'ops=cache', '--as', 'lead'], { dir, env: inTmux, run });
+  assert.equal(code, 0);
+  assert.equal(stdout, 'adopted reviewer (%3, codex) "billing refunds"\nadopted ops (%6, codex) "cache"\n');
+  assert.deepEqual(readWake(dir).map((e) => [e.name, e.target]), [['lead', `${SOCK},%1,100`], ['reviewer', `${SOCK},%3,300`], ['ops', `${SOCK},%6,600`]]);
+});
+
+test('adopt names a cmux surface by part of its workspace or surface title; your own pane is named as such', () => {
+  const dir = tmp();
+  const tree = [
+    'window window:1 UUID-W [current]',
+    '├── workspace workspace:13 UUID-WS "team"',
+    '│       └── surface surface:30 S1 [terminal] "me" [selected] ◀ here tty=ttys007',
+    '└── workspace workspace:14 UUID-WS2 "ops" [selected] ◀ active',
+    '        ├── surface surface:32 UUID-32 [terminal] "◐ billing refunds" [selected] tty=ttys020',
+    '        └── surface surface:33 UUID-33 [terminal] "fix "a=b" parse" tty=ttys021',
+    '',
+  ].join('\n');
+  const ps = { ttys007: 'Ss   login\nS    -zsh\nS+   claude\n', ttys020: 'Ss   login\nS    -zsh\nS+   codex\n', ttys021: 'Ss   login\nS+   -zsh\n' };
+  const run = (cmd, args) => {
+    if (args[0] === 'identify') return '{"caller":{"workspace_ref":"workspace:13","surface_id":"S1"}}\n';
+    if (args[0] === 'tree') return tree;
+    if (cmd === 'ps') return ps[args[1]];
+    return '';
+  };
+  const two = cli(['adopt', 'x=ops', '--as', 'lead'], { dir, run });
+  assert.equal(two.code, 2);
+  assert.equal(two.stderr, 'cmack: "ops" is 2 panes: surface:32 "ops / ◐ billing refunds", surface:33 "ops / fix "a=b" parse"; name one by its id\n');
+  const own = cli(['adopt', 'x=team', '--as', 'lead'], { dir, run });
+  assert.equal(own.stderr, 'cmack: team is your own pane\n');
+  assert.deepEqual(readWake(dir), []);
+  const { code, stdout } = cli(['adopt', 'reviewer=refunds', 'x=a=b', '--as', 'lead'], { dir, run });
+  assert.equal(code, 0);
+  assert.equal(stdout, 'adopted reviewer (surface:32, codex) "◐ billing refunds"\nadopted x (surface:33, shell) "fix "a=b" parse"\n');
+  assert.deepEqual(readWake(dir), [{ name: 'lead', mux: 'cmux', target: 'S1' }, { name: 'reviewer', mux: 'cmux', target: 'UUID-32' }, { name: 'x', mux: 'cmux', target: 'UUID-33' }]);
 });
 
 test('adopt with a name on cmux reaches a surface in another workspace', () => {

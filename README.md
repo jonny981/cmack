@@ -98,7 +98,11 @@ command does the work. Node 22 or later. No dependencies.
    its program, and types one line into each pane so that agent knows its
    name and where the team is. Name them yourself, and any pane at all,
    in any window or workspace, with `cmack adopt builder=%3 reviewer=%4`
-   (a tmux pane id, or a cmux surface). With nothing around it to adopt,
+   (a tmux pane id, or a cmux surface) or by title, `cmack adopt
+   reviewer=billing`: part of the cmux workspace or surface title, or
+   the tmux window name or pane title, any case, as long as it is one
+   pane; an exact title wins, and two matches are listed and refused.
+   With nothing around it to adopt,
    it still seats the agent you are talking to, so `/cmack adopt --as
    lead` makes that agent the lead and you name the other panes next. An
    agent that is already running can also join from inside its own pane
